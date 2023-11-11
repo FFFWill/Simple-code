@@ -1,0 +1,81 @@
+"""观看机"""
+"""接收机"""
+import socket
+import cv2
+import numpy as np
+import os
+import re
+import time
+
+"""
+ipv6,Windows服务器
+将客户端传输的视频接收并显示到Windows窗口上
+录像功能
+"""
+
+# 设置视频的编码解码方式avi
+#video_type = cv2.VideoWriter_fourcc(*'XVID')  # 视频存储的格式
+# 保存的位置，以及编码解码方式，帧率，视频帧大小
+#mp4_file = cv2.VideoWriter('./test_img/%s.avi' % str(time.time()), video_type, 30, (640, 480))
+
+
+
+def getIPv6Address():#获取ipv6长地址,一个元组
+    output = os.popen("ipconfig /all").read()
+    # print(output)
+    result = re.findall(r"(([a-f0-9]{1,4}:){7}[a-f0-9]{1,4})", output, re.I)
+    return result[0][0]
+
+def tcp_server():#创建服务器,创建套接字,使用ipv6公网ip
+    # 1. 创建套接字
+    tcp_server_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    # 为了保证在tcp先断开的情况下，下一次依然能够使用指定的端口，需要设置
+    tcp_server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    #print("绑定本地文件中...")#ipv6 = '2409:8a55:1b15:5e90:9ca4:a565:9e9f:332f'
+    port = 80
+    addrinfo = socket.getaddrinfo(getIPv6Address(), port, 0, 0)[0]#自动获取IPV6地址
+    tcp_server_socket.bind(addrinfo[-1])
+    print(">>>本地IP地址:",addrinfo,"\n")
+
+    #开始监听
+    tcp_server_socket.listen(10)
+    conn, address = tcp_server_socket.accept()
+    print("",address,">>>接入\n")
+    op = input("是否录像?(y/n)")
+    if op == "y":
+        # 设置视频的编码解码方式avi
+        video_type = cv2.VideoWriter_fourcc(*'XVID')  # 视频存储的格式
+        # 保存的位置，以及编码解码方式，帧率，视频帧大小
+        mp4_file = cv2.VideoWriter('./test_img/%s.avi' % str(time.time()), video_type, 30, (640, 480))
+        while True:
+            try:
+                data = conn.recv(100000)  # 88888为接受的最大字节数（默认分辨率情况下图片也就3、4万字节）
+                nparr = np.fromstring(data, dtype='uint8', sep='')  # 化为数组
+                img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)  # 解码为彩色图
+                cv2.imshow('dabo', img)  # 打开窗口显示视频
+                print("获取到帧>>>")
+                ret = mp4_file.write(img)
+                if cv2.waitKey(1) >= 0:  # 每1秒呈现一帧图片，按键盘任何键结束
+                    break
+            except Exception as e:  # 打印出特定错误（个人习惯）
+                print(e)
+    elif op == "n":
+
+        while True:
+            try:
+                data = conn.recv(100000)  # 88888为接受的最大字节数（默认分辨率情况下图片也就3、4万字节）
+                nparr = np.fromstring(data, dtype='uint8', sep='')  # 化为数组
+                img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)  # 解码为彩色图
+                cv2.imshow('dabo', img) # 打开窗口显示视频
+                print("获取到帧>>>")
+                #ret = mp4_file.write(img)
+                if cv2.waitKey(1) >= 0:  # 每1秒呈现一帧图片，按键盘任何键结束
+                    break
+            except Exception as e:  # 打印出特定错误（个人习惯）
+                print(e)
+
+    conn.close()
+    tcp_server_socket.close()
+
+if __name__=="__main__":
+    tcp_server()
